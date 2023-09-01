@@ -2029,8 +2029,11 @@ allowed {x}"""} string""#;
     #[test]
     fn test_fstring_error() {
         use FStringErrorType::{
-            UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
+            SingleRbrace, UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
         };
+
+        assert_eq!(lex_fstring_error(r#"f"{a:b}}""#), SingleRbrace);
+        assert_eq!(lex_fstring_error(r#"f"}""#), SingleRbrace);
 
         assert_eq!(lex_fstring_error(r#"f"{""#), UnclosedLbrace);
         assert_eq!(lex_fstring_error(r#"f"{foo!r""#), UnclosedLbrace);
@@ -2042,8 +2045,10 @@ allowed {x}"""} string""#;
             UnclosedLbrace
         );
         assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
+
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
         assert_eq!(lex_fstring_error(r#"f'"#), UnterminatedString);
+
         assert_eq!(lex_fstring_error(r#"f""""#), UnterminatedTripleQuotedString);
         assert_eq!(lex_fstring_error(r#"f'''"#), UnterminatedTripleQuotedString);
         assert_eq!(
