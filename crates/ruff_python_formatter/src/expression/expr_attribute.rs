@@ -6,9 +6,9 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
-use crate::expression::CallChainLayout;
+use crate::expression::{maybe_parenthesize_expression, CallChainLayout};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -48,33 +48,40 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             if needs_parentheses {
                 value.format().with_options(Parentheses::Always).fmt(f)?;
             } else if call_chain_layout == CallChainLayout::Fluent {
+                let is_parenthesized =
+                    is_expression_parenthesized(value.as_ref().into(), f.context().source());
                 match value.as_ref() {
                     Expr::Attribute(expr) => {
                         expr.format().with_options(call_chain_layout).fmt(f)?;
                     }
                     Expr::Call(expr) => {
-                        expr.format().with_options(call_chain_layout).fmt(f)?;
-                        if call_chain_layout == CallChainLayout::Fluent {
-                            // Format the dot on its own line
-                            soft_line_break().fmt(f)?;
+                        let inner = expr.format().with_options(call_chain_layout);
+                        if is_parenthesized {
+                            parenthesized("(", &inner, ")").fmt(f)?;
+                        } else {
+                            inner.fmt(f)?;
                         }
+
+                        // Format the dot on its own line.
+                        soft_line_break().fmt(f)?;
                     }
                     Expr::Subscript(expr) => {
-                        expr.format().with_options(call_chain_layout).fmt(f)?;
-                        if call_chain_layout == CallChainLayout::Fluent {
-                            // Format the dot on its own line
-                            soft_line_break().fmt(f)?;
+                        let inner = expr.format().with_options(call_chain_layout);
+                        if is_parenthesized {
+                            parenthesized("(", &inner, ")").fmt(f)?;
+                        } else {
+                            inner.fmt(f)?;
                         }
+
+                        // Format the dot on its own line.
+                        soft_line_break().fmt(f)?;
                     }
                     _ => {
-                        // This matches [`CallChainLayout::from_expression`]
-                        if is_expression_parenthesized(value.as_ref().into(), f.context().source())
-                        {
-                            value.format().with_options(Parentheses::Always).fmt(f)?;
-                            // Format the dot on its own line
+                        value.format().fmt(f)?;
+
+                        if is_parenthesized {
+                            // Format the dot on its own line.
                             soft_line_break().fmt(f)?;
-                        } else {
-                            value.format().fmt(f)?;
                         }
                     }
                 }
